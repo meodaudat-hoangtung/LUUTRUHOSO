@@ -62,6 +62,21 @@
         "isInitialized": { "type": "boolean" },
         "updatedAt": { "type": "string" }
       }
+    },
+    "FileChunk": {
+      "title": "File Chunk",
+      "description": "Binary file chunk stored in Cloud Firestore for cross-device synchronization",
+      "type": "object",
+      "properties": {
+        "chunkIndex": { "type": "number" },
+        "totalChunks": { "type": "number" },
+        "data": { "type": "string" },
+        "fileName": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "fileSize": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["chunkIndex", "totalChunks", "data"]
     }
   },
   "firestore": {
@@ -76,6 +91,10 @@
     "/documents/{documentId}": {
       "schema": "DocumentItem",
       "description": "Collection of documents"
+    },
+    "/documents/{documentId}/file_chunks/{chunkId}": {
+      "schema": "FileChunk",
+      "description": "Cloud-synced binary file chunks for full cross-device viewing"
     }
   }
 }
