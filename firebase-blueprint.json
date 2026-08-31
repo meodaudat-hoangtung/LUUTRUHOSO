@@ -1,0 +1,81 @@
+{
+  "entities": {
+    "TeacherProfile": {
+      "title": "Teacher Profile",
+      "description": "Teacher profile information and display preferences",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "subject": { "type": "string" },
+        "school": { "type": "string" },
+        "academicYear": { "type": "string" },
+        "quote": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "adminTitle": { "type": "string" },
+        "showAvatar": { "type": "boolean" },
+        "showRole": { "type": "boolean" },
+        "showSubject": { "type": "boolean" },
+        "showSchool": { "type": "boolean" },
+        "showAcademicYear": { "type": "boolean" },
+        "showQuote": { "type": "boolean" },
+        "showEmail": { "type": "boolean" },
+        "showPhone": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "DocumentItem": {
+      "title": "Document Item",
+      "description": "Educational documents and lesson plans",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "grade": { "type": "string" },
+        "semester": { "type": "string" },
+        "academicYear": { "type": "string" },
+        "fileType": { "type": "string" },
+        "fileSize": { "type": "string" },
+        "isPinned": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "description": { "type": "string" },
+        "author": { "type": "string" },
+        "school": { "type": "string" },
+        "contentPreview": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "fileDataUrl": { "type": "string" },
+        "downloadUrl": { "type": "string" },
+        "externalLink": { "type": "string" }
+      },
+      "required": ["title", "category", "fileType"]
+    },
+    "AppSettings": {
+      "title": "App Settings",
+      "description": "Application settings including admin password and initialization flag",
+      "type": "object",
+      "properties": {
+        "adminPassword": { "type": "string" },
+        "isInitialized": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/settings/{settingId}": {
+      "schema": "AppSettings",
+      "description": "Global application settings and initialization state"
+    },
+    "/profile/{profileId}": {
+      "schema": "TeacherProfile",
+      "description": "Teacher profile single document"
+    },
+    "/documents/{documentId}": {
+      "schema": "DocumentItem",
+      "description": "Collection of documents"
+    }
+  }
+}

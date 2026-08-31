@@ -52,7 +52,16 @@ export interface TeacherProfile {
   email: string;
   phone: string;
   avatarUrl: string;
-  adminTitle: string;
+  adminTitle?: string;
+  // Field-level visibility toggles (cho phép hiển thị hoặc ẩn tùy ý muốn)
+  showAvatar?: boolean;
+  showRole?: boolean;
+  showSubject?: boolean;
+  showSchool?: boolean;
+  showAcademicYear?: boolean;
+  showQuote?: boolean;
+  showEmail?: boolean;
+  showPhone?: boolean;
 }
 
 export interface FilterState {

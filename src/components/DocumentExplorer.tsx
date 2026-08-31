@@ -358,24 +358,20 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({
                         >
                           <Download className="w-3.5 h-3.5" />
                         </button>
-                        {isAdmin && (
-                          <>
-                            <button
-                              onClick={() => onEdit(doc)}
-                              title="Chỉnh sửa"
-                              className="p-1 rounded hover:bg-blue-950/60 text-slate-400 hover:text-sky-300 transition-colors cursor-pointer"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => onDelete(doc.id)}
-                              title="Xóa"
-                              className="p-1 rounded hover:bg-red-950/60 text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </>
-                        )}
+                        <button
+                          onClick={() => onEdit(doc)}
+                          title="Chỉnh sửa"
+                          className="p-1 rounded hover:bg-blue-950/60 text-slate-400 hover:text-sky-300 transition-colors cursor-pointer"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => onDelete(doc.id)}
+                          title="Xóa"
+                          className="p-1 rounded hover:bg-red-950/60 text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </td>
                   </tr>

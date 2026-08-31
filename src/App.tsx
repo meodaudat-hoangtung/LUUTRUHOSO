@@ -6,8 +6,18 @@ import {
   TeacherProfile, 
   ToastMessage 
 } from './types';
-import { initialDocuments, initialTeacherProfile, DEFAULT_ADMIN_PASSWORD } from './data/initialData';
+import { initialTeacherProfile, DEFAULT_ADMIN_PASSWORD } from './data/initialData';
 import { downloadRealDocument, deleteOriginalFile } from './utils/fileStorage';
+import { 
+  subscribeToDocuments, 
+  subscribeToProfile, 
+  subscribeToSettings, 
+  saveDocumentToFirestore, 
+  deleteDocumentFromFirestore, 
+  togglePinInFirestore, 
+  saveProfileToFirestore, 
+  saveAdminPasswordToFirestore 
+} from './lib/firestoreService';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { ProfileHeroCard } from './components/ProfileHeroCard';
@@ -18,10 +28,11 @@ import { ProfileEditModal } from './components/ProfileEditModal';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { Cv5512GeneratorModal } from './components/Cv5512GeneratorModal';
+import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { ToastContainer } from './components/Toast';
 
 export default function App() {
-  // LocalStorage-backed profile state
+  // Cloud Firestore-synced teacher profile state
   const [profile, setProfile] = useState<TeacherProfile>(() => {
     try {
       const saved = localStorage.getItem('teacher_profile');
@@ -31,21 +42,20 @@ export default function App() {
     }
   });
 
-  // LocalStorage-backed documents state
+  // Cloud Firestore-synced documents state
   const [documents, setDocuments] = useState<DocumentItem[]>(() => {
     try {
       const saved = localStorage.getItem('teacher_documents');
-      return saved ? JSON.parse(saved) : initialDocuments;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return initialDocuments;
+      return [];
     }
   });
 
-  // LocalStorage-backed admin password (Default: Tunganh7788)
+  // Cloud Firestore-synced admin password
   const [adminPassword, setAdminPassword] = useState<string>(() => {
     try {
       const saved = localStorage.getItem('teacher_admin_password');
-      // If legacy password was stored, update to Tunganh7788
       if (saved && saved !== 'Tunganh7787') {
         return saved;
       }
@@ -89,6 +99,11 @@ export default function App() {
   const [loginReason, setLoginReason] = useState<'upload' | 'general' | 'edit' | 'delete' | 'profile'>('general');
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [cv5512ModalOpen, setCv5512ModalOpen] = useState(false);
+  
+  // Confirm Delete Dialog state
+  const [docToDelete, setDocToDelete] = useState<DocumentItem | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [isDeletingDoc, setIsDeletingDoc] = useState(false);
 
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -101,24 +116,46 @@ export default function App() {
     }, 4000);
   };
 
-  // Sync to localStorage
+  // 1. Real-time Firestore synchronizer across ALL browsers, devices and tabs
   useEffect(() => {
-    try {
-      localStorage.setItem('teacher_profile', JSON.stringify(profile));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [profile]);
+    // Realtime documents listener
+    const unsubDocs = subscribeToDocuments((cloudDocs) => {
+      setDocuments(cloudDocs);
+      try {
+        localStorage.setItem('teacher_documents', JSON.stringify(cloudDocs));
+      } catch (e) {
+        console.error(e);
+      }
+    });
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('teacher_documents', JSON.stringify(documents));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [documents]);
+    // Realtime profile listener
+    const unsubProfile = subscribeToProfile((cloudProfile) => {
+      setProfile(cloudProfile);
+      try {
+        localStorage.setItem('teacher_profile', JSON.stringify(cloudProfile));
+      } catch (e) {
+        console.error(e);
+      }
+    });
 
-  // Handle updates
+    // Realtime password & settings listener
+    const unsubSettings = subscribeToSettings((cloudPassword) => {
+      setAdminPassword(cloudPassword);
+      try {
+        localStorage.setItem('teacher_admin_password', cloudPassword);
+      } catch (e) {
+        console.error(e);
+      }
+    });
+
+    return () => {
+      unsubDocs();
+      unsubProfile();
+      unsubSettings();
+    };
+  }, []);
+
+  // Handle filter updates
   const handleUpdateFilter = (updates: Partial<FilterState>) => {
     setFilterState((prev) => ({ ...prev, ...updates }));
   };
@@ -165,18 +202,20 @@ export default function App() {
     showToast('Đã đăng xuất quyền quản trị. Trang web đang ở chế độ xem an toàn.', 'info');
   };
 
-  const handleChangePassword = (newPass: string) => {
+  const handleChangePassword = async (newPass: string) => {
     setAdminPassword(newPass);
     try {
       localStorage.setItem('teacher_admin_password', newPass);
+      await saveAdminPasswordToFirestore(newPass);
+      showToast('Đổi mật khẩu quản trị thành công! Đã đồng bộ lên cơ sở dữ liệu.');
     } catch (e) {
       console.error(e);
+      showToast('Đã đổi mật khẩu cục bộ.');
     }
-    showToast('Đổi mật khẩu quản trị thành công!');
   };
 
-  // Document Operations
-  const handleTogglePin = (id: string) => {
+  // Document Operations (Real-time Cloud Firestore)
+  const handleTogglePin = async (id: string) => {
     if (!isAdmin) {
       handleOpenLogin('general', () => handleTogglePin(id));
       return;
@@ -184,50 +223,116 @@ export default function App() {
     const target = documents.find((d) => d.id === id);
     if (!target) return;
     const nextState = !target.isPinned;
+    
+    // Optimistic UI update
     setDocuments((prev) =>
       prev.map((doc) => (doc.id === id ? { ...doc, isPinned: nextState } : doc))
     );
-    showToast(nextState ? 'Đã ghim tài liệu quan trọng lên đầu!' : 'Đã bỏ ghim tài liệu.', 'info');
+
+    try {
+      await togglePinInFirestore(id, nextState);
+      showToast(nextState ? 'Đã ghim tài liệu quan trọng lên đầu!' : 'Đã bỏ ghim tài liệu.', 'info');
+    } catch (err) {
+      console.error('Error toggling pin in Firestore:', err);
+    }
   };
 
-  const handleDeleteDoc = async (id: string) => {
+  // Trigger Delete flow (prompts login if not admin, then opens clean in-app confirm dialog)
+  const handleDeleteDoc = (id: string) => {
+    const target = documents.find((d) => d.id === id);
+    if (!target) return;
+
     if (!isAdmin) {
-      handleOpenLogin('delete', () => handleDeleteDoc(id));
+      handleOpenLogin('delete', () => {
+        setDocToDelete(target);
+        setConfirmDeleteOpen(true);
+      });
       return;
     }
-    const target = documents.find((d) => d.id === id);
-    if (target) {
-      if (window.confirm(`Bạn có chắc chắn muốn xóa tài liệu "${target.title}"? Hành động này sẽ xóa hoàn toàn khỏi hệ thống.`)) {
-        await deleteOriginalFile(id);
-        setDocuments((prev) => prev.filter((d) => d.id !== id));
-        showToast(`Đã xóa "${target.title}" thành công.`, 'warning');
+
+    setDocToDelete(target);
+    setConfirmDeleteOpen(true);
+  };
+
+  // Confirm and execute document deletion
+  const handleConfirmDelete = async () => {
+    if (!docToDelete) return;
+    const target = docToDelete;
+    setIsDeletingDoc(true);
+
+    try {
+      // Optimistic UI update
+      setDocuments((prev) => prev.filter((d) => d.id !== target.id));
+      
+      // If currently previewing the deleted document, close preview
+      if (previewDoc && previewDoc.id === target.id) {
+        setPreviewDoc(null);
       }
+
+      // Delete from cloud Firestore
+      await deleteDocumentFromFirestore(target.id);
+      // Delete from IndexedDB binary cache
+      await deleteOriginalFile(target.id);
+
+      showToast(`Đã xóa vĩnh viễn "${target.title}" thành công trên mọi thiết bị.`, 'warning');
+    } catch (err) {
+      console.error('Error deleting document from Firestore:', err);
+      showToast('Đã xóa tài liệu khỏi bộ nhớ.', 'warning');
+    } finally {
+      setIsDeletingDoc(false);
+      setConfirmDeleteOpen(false);
+      setDocToDelete(null);
     }
   };
 
-  const handleSaveDoc = (doc: DocumentItem) => {
+  const handleSaveDoc = async (doc: DocumentItem) => {
     const exists = documents.some((d) => d.id === doc.id);
+    
+    // Optimistic UI update
     if (exists) {
       setDocuments((prev) => prev.map((d) => (d.id === doc.id ? doc : d)));
-      showToast(`Đã cập nhật "${doc.title}" thành công.`);
     } else {
       setDocuments((prev) => [doc, ...prev]);
-      showToast(`Đã tải lên và lưu "${doc.title}" vào hồ sơ thành công!`);
+    }
+
+    try {
+      await saveDocumentToFirestore(doc);
+      if (exists) {
+        showToast(`Đã cập nhật "${doc.title}" và đồng bộ lên đám mây thành công!`);
+      } else {
+        showToast(`Đã tải lên và đồng bộ "${doc.title}" trên tất cả các trình duyệt!`);
+      }
+    } catch (err) {
+      console.error('Error saving document to Firestore:', err);
+      showToast(`Đã lưu "${doc.title}" vào bộ nhớ.`);
     }
   };
 
-  const handleSaveProfile = (updatedProfile: TeacherProfile) => {
+  const handleSaveProfile = async (updatedProfile: TeacherProfile) => {
     setProfile(updatedProfile);
-    showToast('Đã cập nhật hồ sơ giáo viên thành công!');
+    try {
+      await saveProfileToFirestore(updatedProfile);
+      showToast('Đã cập nhật hồ sơ giáo viên và đồng bộ trên mọi thiết bị!');
+    } catch (err) {
+      console.error('Error saving profile to Firestore:', err);
+      showToast('Đã cập nhật hồ sơ giáo viên!');
+    }
   };
 
-  const handleUpdateAvatarDirectly = (avatarDataUrl: string) => {
+  const handleUpdateAvatarDirectly = async (avatarDataUrl: string) => {
     if (!isAdmin) {
       handleOpenLogin('profile');
       return;
     }
-    setProfile((prev) => ({ ...prev, avatarUrl: avatarDataUrl }));
-    showToast('Đã cập nhật ảnh đại diện mới thành công!');
+    const updated = { ...profile, avatarUrl: avatarDataUrl };
+    setProfile(updated);
+    try {
+      await saveProfileToFirestore(updated);
+      showToast('Đã cập nhật ảnh đại diện mới và đồng bộ trên mọi thiết bị!');
+    } catch (err) {
+      console.error('Error saving avatar to Firestore:', err);
+      showToast('Đã cập nhật ảnh đại diện mới!');
+    }
   };
 
   const handleDownloadDoc = (doc: DocumentItem) => {
@@ -243,7 +348,7 @@ export default function App() {
         const query = filterState.search.toLowerCase();
         const matchTitle = doc.title.toLowerCase().includes(query);
         const matchCategory = doc.category.toLowerCase().includes(query);
-        const matchSubject = doc.subject.toLowerCase().includes(query);
+        const matchSubject = doc.subject?.toLowerCase().includes(query) || false;
         const matchDesc = doc.description?.toLowerCase().includes(query) || false;
         const matchContent = doc.contentPreview?.toLowerCase().includes(query) || false;
         if (!matchTitle && !matchCategory && !matchSubject && !matchDesc && !matchContent) {
@@ -375,7 +480,7 @@ export default function App() {
             </span>
           </div>
 
-          {/* Teacher Profile Hero Card */}
+          {/* Teacher Profile Hero Card (Flat 2D with golden border) */}
           <ProfileHeroCard
             profile={profile}
             isAdmin={isAdmin}
@@ -434,6 +539,7 @@ export default function App() {
         onClose={() => setPreviewDoc(null)}
         onTogglePin={handleTogglePin}
         onDownload={handleDownloadDoc}
+        onDelete={handleDeleteDoc}
         onEdit={(doc) => {
           if (isAdmin) {
             setPreviewDoc(null);
@@ -490,6 +596,18 @@ export default function App() {
         onClose={() => setCv5512ModalOpen(false)}
         onSaveToPortfolio={handleSaveDoc}
         profile={profile}
+      />
+
+      {/* Confirmation Modal for Document Deletion */}
+      <ConfirmDeleteModal
+        isOpen={confirmDeleteOpen}
+        document={docToDelete}
+        onClose={() => {
+          setConfirmDeleteOpen(false);
+          setDocToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        isDeleting={isDeletingDoc}
       />
 
       {/* Toast notifications */}

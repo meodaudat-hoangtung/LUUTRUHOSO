@@ -87,23 +87,17 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
           </div>
 
           {/* Pin / Star button */}
-          {isAdmin ? (
-            <button
-              onClick={() => onTogglePin(document.id)}
-              title={isPinned ? 'Bỏ ghim tài liệu' : 'Ghim tài liệu quan trọng'}
-              className="p-1 rounded-md hover:bg-white/20 transition-colors cursor-pointer text-white/90 flex-shrink-0"
-            >
-              {isPinned ? (
-                <Star className="w-4 h-4 text-amber-300 fill-amber-300 drop-shadow-xs" />
-              ) : (
-                <Star className="w-3.5 h-3.5 text-white/70 hover:text-amber-300 transition-colors" />
-              )}
-            </button>
-          ) : isPinned ? (
-            <div className="p-1 text-amber-300 flex-shrink-0" title="Tài liệu đã ghim quan trọng">
-              <Star className="w-4 h-4 fill-amber-300" />
-            </div>
-          ) : null}
+          <button
+            onClick={() => onTogglePin(document.id)}
+            title={isPinned ? 'Bỏ ghim tài liệu' : 'Ghim tài liệu quan trọng'}
+            className="p-1 rounded-md hover:bg-white/20 transition-colors cursor-pointer text-white/90 flex-shrink-0"
+          >
+            {isPinned ? (
+              <Star className="w-4 h-4 text-amber-300 fill-amber-300 drop-shadow-xs" />
+            ) : (
+              <Star className="w-3.5 h-3.5 text-white/70 hover:text-amber-300 transition-colors" />
+            )}
+          </button>
 
         </div>
 
@@ -158,28 +152,24 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
           <span>Xem trước</span>
         </button>
 
-        {/* Right icons: Edit & Delete (Admin only) */}
-        {isAdmin ? (
-          <div className="flex items-center gap-0.5">
-            <button
-              onClick={() => onEdit(document)}
-              className="p-1.5 rounded-md hover:bg-white/15 text-sky-100 hover:text-white transition-colors cursor-pointer"
-              title="Chỉnh sửa thông tin"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
+        {/* Right icons: Edit & Delete */}
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={() => onEdit(document)}
+            className="p-1.5 rounded-md hover:bg-white/15 text-sky-100 hover:text-white transition-colors cursor-pointer"
+            title="Chỉnh sửa thông tin tài liệu"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
 
-            <button
-              onClick={() => onDelete(document.id)}
-              className="p-1.5 rounded-md hover:bg-red-600 text-sky-100 hover:text-white transition-colors cursor-pointer"
-              title="Xóa tài liệu"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        ) : (
-          <div className="w-3" />
-        )}
+          <button
+            onClick={() => onDelete(document.id)}
+            className="p-1.5 rounded-md hover:bg-red-600 text-sky-100 hover:text-white transition-colors cursor-pointer"
+            title="Xóa tài liệu"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
 
       </div>
 

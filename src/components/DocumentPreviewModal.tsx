@@ -19,7 +19,9 @@ import {
   Info,
   Eye,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Trash2,
+  Pencil
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import * as docx from 'docx-preview';
@@ -33,6 +35,7 @@ interface DocumentPreviewModalProps {
   onTogglePin: (id: string) => void;
   onDownload: (doc: DocumentItem) => void;
   onEdit: (doc: DocumentItem) => void;
+  onDelete?: (id: string) => void;
 }
 
 export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
@@ -40,7 +43,8 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   onClose,
   onTogglePin,
   onDownload,
-  onEdit
+  onEdit,
+  onDelete
 }) => {
   const [copied, setCopied] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -287,11 +291,29 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             <button
               onClick={() => onDownload(document)}
               title="Tải xuống tệp thực tế"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition-colors cursor-pointer shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium transition-colors cursor-pointer shadow-xs"
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Tải xuống tệp</span>
             </button>
+
+            <button
+              onClick={() => onEdit(document)}
+              title="Chỉnh sửa thông tin tài liệu"
+              className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-sky-300 transition-colors cursor-pointer"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+
+            {onDelete && (
+              <button
+                onClick={() => onDelete(document.id)}
+                title="Xóa tài liệu này"
+                className="p-1.5 rounded hover:bg-red-950/60 text-slate-400 hover:text-red-400 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
 
             <button
               onClick={() => setIsFullscreen(!isFullscreen)}

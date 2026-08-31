@@ -12,7 +12,15 @@ export const initialTeacherProfile: TeacherProfile = {
   email: '07071987hoangtung@gmail.com',
   phone: '0982.xxx.202',
   avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
-  adminTitle: 'Quản trị viên / Đầy đủ quyền'
+  adminTitle: 'Quản trị viên / Đầy đủ quyền',
+  showAvatar: true,
+  showRole: true,
+  showSubject: true,
+  showSchool: true,
+  showAcademicYear: true,
+  showQuote: true,
+  showEmail: true,
+  showPhone: true
 };
 
 export const sampleCv5512Content1 = `
