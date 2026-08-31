@@ -1,0 +1,6 @@
+{
+  "name": "Hồ Sơ Cá Nhân Giáo Viên",
+  "description": "Hệ thống quản lý hồ sơ cá nhân, giáo án và tài liệu giảng dạy cho giáo viên theo chuẩn GDPT 2018 và CV 5512.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
