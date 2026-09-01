@@ -40,6 +40,8 @@ export interface DocumentItem {
   fileDataUrl?: string;
   fileMimeType?: string;
   hasOriginalFile?: boolean;
+  hasCloudFile?: boolean;
+  externalLink?: string;
 }
 
 export interface TeacherProfile {

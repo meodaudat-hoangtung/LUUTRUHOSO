@@ -3,6 +3,7 @@ import {
   doc, 
   setDoc, 
   getDoc, 
+  getDocs,
   deleteDoc, 
   onSnapshot, 
   updateDoc,
@@ -21,6 +22,155 @@ function sanitizeForFirestore<T extends Record<string, any>>(obj: T): Record<str
     }
   }
   return clean;
+}
+
+// Convert Uint8Array to base64 safely without callstack overflow
+export function uint8ArrayToBase64(uint8: Uint8Array): string {
+  let binary = '';
+  const len = uint8.byteLength;
+  const chunkSize = 8192;
+  for (let i = 0; i < len; i += chunkSize) {
+    const chunk = uint8.subarray(i, Math.min(i + chunkSize, len));
+    binary += String.fromCharCode.apply(null, chunk as any);
+  }
+  return window.btoa(binary);
+}
+
+// Convert base64 back to Uint8Array safely
+export function base64ToUint8Array(base64: string): Uint8Array {
+  const binaryString = window.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+// Base64 chunk character length: 450,000 characters ~ 330KB binary per chunk
+const BASE64_CHUNK_SIZE = 450000;
+
+/**
+ * Save binary file chunks to Firestore for cross-device synchronization
+ */
+export async function saveFileChunksToFirestore(
+  docId: string, 
+  fileMeta: { fileName: string; mimeType: string; fileSize: string; uint8Array: Uint8Array }
+): Promise<void> {
+  try {
+    const base64Data = uint8ArrayToBase64(fileMeta.uint8Array);
+    const totalLength = base64Data.length;
+    const totalChunks = Math.ceil(totalLength / BASE64_CHUNK_SIZE) || 1;
+
+    // Delete any old chunks first if there were more chunks previously
+    await deleteFileChunksFromFirestore(docId);
+
+    const chunksColRef = collection(db, 'documents', docId, 'file_chunks');
+    const batch = writeBatch(db);
+
+    for (let i = 0; i < totalChunks; i++) {
+      const chunkData = base64Data.substring(i * BASE64_CHUNK_SIZE, (i + 1) * BASE64_CHUNK_SIZE);
+      const chunkDocRef = doc(chunksColRef, `chunk_${i}`);
+      batch.set(chunkDocRef, {
+        chunkIndex: i,
+        totalChunks,
+        data: chunkData,
+        fileName: fileMeta.fileName,
+        mimeType: fileMeta.mimeType,
+        fileSize: fileMeta.fileSize,
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    // Update main document flag
+    const mainDocRef = doc(db, 'documents', docId);
+    batch.update(mainDocRef, {
+      hasCloudFile: true,
+      hasOriginalFile: true,
+      originalFileName: fileMeta.fileName,
+      fileMimeType: fileMeta.mimeType,
+      fileSize: fileMeta.fileSize,
+      updatedAt: new Date().toISOString()
+    });
+
+    await batch.commit();
+  } catch (err) {
+    console.error('Error saving file chunks to Firestore:', err);
+    throw err;
+  }
+}
+
+/**
+ * Retrieve binary file chunks from Firestore and reconstruct original Uint8Array / Blob
+ */
+export async function getFileChunksFromFirestore(docId: string): Promise<{
+  fileName: string;
+  mimeType: string;
+  fileSize: string;
+  uint8Array: Uint8Array;
+  blob: Blob;
+  arrayBuffer: ArrayBuffer;
+} | null> {
+  try {
+    const chunksColRef = collection(db, 'documents', docId, 'file_chunks');
+    const snapshot = await getDocs(chunksColRef);
+    if (snapshot.empty) {
+      return null;
+    }
+
+    const chunkDocs: { chunkIndex: number; totalChunks: number; data: string; fileName?: string; mimeType?: string; fileSize?: string }[] = [];
+    snapshot.forEach((snap) => {
+      chunkDocs.push(snap.data() as any);
+    });
+
+    // Sort chunks by index 0, 1, 2...
+    chunkDocs.sort((a, b) => a.chunkIndex - b.chunkIndex);
+
+    let fullBase64 = '';
+    for (const chunk of chunkDocs) {
+      fullBase64 += chunk.data;
+    }
+
+    const firstChunk = chunkDocs[0];
+    const mimeType = firstChunk.mimeType || 'application/pdf';
+    const fileName = firstChunk.fileName || 'document.pdf';
+    const fileSize = firstChunk.fileSize || '';
+
+    const uint8Array = base64ToUint8Array(fullBase64);
+    const blob = new Blob([uint8Array], { type: mimeType });
+    const arrayBuffer = uint8Array.buffer.slice(0);
+
+    return {
+      fileName,
+      mimeType,
+      fileSize,
+      uint8Array,
+      blob,
+      arrayBuffer
+    };
+  } catch (err) {
+    console.error('Error getting file chunks from Firestore:', err);
+    return null;
+  }
+}
+
+/**
+ * Delete all file chunks for a document from Firestore
+ */
+export async function deleteFileChunksFromFirestore(docId: string): Promise<void> {
+  try {
+    const chunksColRef = collection(db, 'documents', docId, 'file_chunks');
+    const snapshot = await getDocs(chunksColRef);
+    if (snapshot.empty) return;
+
+    const batch = writeBatch(db);
+    snapshot.forEach((snap) => {
+      batch.delete(snap.ref);
+    });
+    await batch.commit();
+  } catch (err) {
+    console.warn('Error deleting file chunks from Firestore:', err);
+  }
 }
 
 /**
@@ -98,7 +248,9 @@ export function subscribeToDocuments(onData: (docs: DocumentItem[]) => void, onE
           originalFileName: data.originalFileName || '',
           fileDataUrl: data.fileDataUrl || '',
           fileMimeType: data.fileMimeType || '',
-          hasOriginalFile: Boolean(data.hasOriginalFile)
+          hasOriginalFile: Boolean(data.hasOriginalFile),
+          hasCloudFile: Boolean(data.hasCloudFile),
+          externalLink: data.externalLink || ''
         } as DocumentItem);
       });
 
@@ -194,6 +346,8 @@ export async function saveDocumentToFirestore(document: DocumentItem): Promise<v
  * Delete document permanently from Firestore.
  */
 export async function deleteDocumentFromFirestore(id: string): Promise<void> {
+  // Delete file chunks subcollection first
+  await deleteFileChunksFromFirestore(id);
   const docRef = doc(db, 'documents', id);
   await deleteDoc(docRef);
 }

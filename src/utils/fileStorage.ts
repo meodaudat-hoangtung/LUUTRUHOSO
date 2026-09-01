@@ -1,6 +1,11 @@
 import { get, set, del } from 'idb-keyval';
 import * as XLSX from 'xlsx';
 import { DocumentItem, FileFormat } from '../types';
+import { 
+  saveFileChunksToFirestore, 
+  getFileChunksFromFirestore, 
+  deleteFileChunksFromFirestore 
+} from '../lib/firestoreService';
 
 export interface StoredFileRecord {
   docId: string;
@@ -12,6 +17,7 @@ export interface StoredFileRecord {
   uint8Array?: Uint8Array;
   arrayBuffer?: ArrayBuffer;
   dataUrl?: string;
+  isCloudSynced?: boolean;
 }
 
 const STORAGE_PREFIX = 'teacher_doc_file_';
@@ -118,8 +124,8 @@ export async function getFreshArrayBuffer(
 }
 
 /**
- * Save an uploaded file to IndexedDB for a document
- * Supports files of any size (1MB, 10MB, 50MB+) using raw Blob storage
+ * Save an uploaded file to IndexedDB for a document and sync to Cloud Firestore
+ * Supports cross-device synchronization so any device can view the full original document!
  */
 export async function saveOriginalFile(
   docId: string,
@@ -129,7 +135,7 @@ export async function saveOriginalFile(
   const arrayBuf = await file.arrayBuffer();
   const uint8 = new Uint8Array(arrayBuf);
 
-  // Store Blob directly in IndexedDB (fastest & most reliable for large files)
+  // Store Blob directly in IndexedDB (fastest & most reliable for local cache)
   const record: StoredFileRecord = {
     docId,
     fileName: file.name,
@@ -138,6 +144,7 @@ export async function saveOriginalFile(
     updatedAt: new Date().toISOString(),
     blob: file,
     uint8Array: uint8,
+    isCloudSynced: false
   };
 
   try {
@@ -145,7 +152,6 @@ export async function saveOriginalFile(
   } catch (err) {
     console.warn('IndexedDB save error, storing with Uint8Array fallback:', err);
     try {
-      // Fallback without full file object
       await set(`${STORAGE_PREFIX}${docId}`, {
         docId,
         fileName: file.name,
@@ -159,32 +165,82 @@ export async function saveOriginalFile(
     }
   }
 
+  // Synchronize binary chunks to Cloud Firestore for cross-device viewing
+  try {
+    await saveFileChunksToFirestore(docId, {
+      fileName: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      fileSize: formatBytes(file.size),
+      uint8Array: uint8
+    });
+    record.isCloudSynced = true;
+  } catch (cloudErr) {
+    console.warn('Could not sync file chunks to Firestore (might be offline or too large):', cloudErr);
+  }
+
   return record;
 }
 
 /**
- * Retrieve an uploaded file from IndexedDB
+ * Retrieve an uploaded file from IndexedDB or Cloud Firestore
  */
 export async function getOriginalFile(docId: string): Promise<StoredFileRecord | null> {
+  // 1. First check local IndexedDB
   try {
     const record = (await get(`${STORAGE_PREFIX}${docId}`)) as StoredFileRecord | undefined;
-    if (record) {
+    if (record && (record.blob || record.uint8Array || record.arrayBuffer || record.dataUrl)) {
       return record;
     }
   } catch (err) {
     console.warn('Failed to retrieve from IndexedDB:', err);
   }
+
+  // 2. If not found in local IndexedDB (e.g. user is on a new device/browser), download from Cloud Firestore
+  try {
+    const cloudFile = await getFileChunksFromFirestore(docId);
+    if (cloudFile) {
+      const reconstructedRecord: StoredFileRecord = {
+        docId,
+        fileName: cloudFile.fileName,
+        mimeType: cloudFile.mimeType,
+        fileSize: cloudFile.fileSize,
+        updatedAt: new Date().toISOString(),
+        blob: cloudFile.blob,
+        uint8Array: cloudFile.uint8Array,
+        arrayBuffer: cloudFile.arrayBuffer,
+        isCloudSynced: true
+      };
+
+      // Cache into local IndexedDB for instant loads on subsequent clicks
+      try {
+        await set(`${STORAGE_PREFIX}${docId}`, reconstructedRecord);
+      } catch (cacheErr) {
+        console.warn('Could not cache cloud file into IndexedDB:', cacheErr);
+      }
+
+      return reconstructedRecord;
+    }
+  } catch (cloudErr) {
+    console.error('Error fetching file chunks from Cloud Firestore:', cloudErr);
+  }
+
   return null;
 }
 
 /**
- * Delete an uploaded file from IndexedDB
+ * Delete an uploaded file from IndexedDB and Cloud Firestore
  */
 export async function deleteOriginalFile(docId: string): Promise<void> {
   try {
     await del(`${STORAGE_PREFIX}${docId}`);
   } catch (err) {
     console.warn('Failed to delete from IndexedDB:', err);
+  }
+
+  try {
+    await deleteFileChunksFromFirestore(docId);
+  } catch (err) {
+    console.warn('Failed to delete chunks from Firestore:', err);
   }
 }
 

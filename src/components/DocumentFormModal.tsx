@@ -199,6 +199,7 @@ b) Nhiệm vụ về nhà: Tìm hiểu thêm các mô hình toán học ứng d�
     let fileMimeType = initialDoc?.fileMimeType;
     let fileDataUrl = initialDoc?.fileDataUrl;
     let hasOriginalFile = initialDoc?.hasOriginalFile || false;
+    let hasCloudFile = initialDoc?.hasCloudFile || false;
 
     if (selectedFile) {
       try {
@@ -207,6 +208,7 @@ b) Nhiệm vụ về nhà: Tìm hiểu thêm các mô hình toán học ứng d�
         fileMimeType = record.mimeType;
         fileDataUrl = record.dataUrl;
         hasOriginalFile = true;
+        hasCloudFile = record.isCloudSynced || true;
       } catch (err) {
         console.error('Error saving original file:', err);
       }
@@ -232,7 +234,8 @@ b) Nhiệm vụ về nhà: Tìm hiểu thêm các mô hình toán học ứng d�
       originalFileName,
       fileMimeType,
       fileDataUrl,
-      hasOriginalFile
+      hasOriginalFile,
+      hasCloudFile
     };
 
     setIsSaving(false);
