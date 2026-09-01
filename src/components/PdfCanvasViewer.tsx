@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -14,11 +15,18 @@ import {
 } from 'lucide-react';
 import { StoredFileRecord, getFreshArrayBuffer } from '../utils/fileStorage';
 
-// Configure PDF.js worker
+// Configure PDF.js worker with Vite bundled URL and reliable fallback
 try {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 } catch (e) {
-  console.warn('PDF.js worker setup fallback:', e);
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.min.mjs',
+      import.meta.url
+    ).toString();
+  } catch (err) {
+    console.warn('PDF.js worker setup fallback:', err);
+  }
 }
 
 interface PdfCanvasViewerProps {
@@ -43,11 +51,19 @@ export const PdfCanvasViewer: React.FC<PdfCanvasViewerProps> = ({
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [numPages, setNumPages] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [scale, setScale] = useState<number>(1.2);
+  // Auto compute initial scale for mobile devices (screen width < 640px)
+  const [scale, setScale] = useState<number>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 640) {
+      return Number(Math.max(0.5, (window.innerWidth - 48) / 595).toFixed(2));
+    }
+    return 1.15;
+  });
   const [rotation, setRotation] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'single' | 'continuous'>('continuous');
+  const [viewMode, setViewMode] = useState<'single' | 'continuous'>(() => {
+    return typeof window !== 'undefined' && window.innerWidth < 640 ? 'continuous' : 'continuous';
+  });
 
   // Track active render tasks per page to avoid collision errors
   const activeRenderTasks = useRef<{ [page: number]: any }>({});

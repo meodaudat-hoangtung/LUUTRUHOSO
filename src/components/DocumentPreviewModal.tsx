@@ -21,13 +21,30 @@ import {
   RefreshCw,
   AlertCircle,
   Trash2,
-  Pencil
+  Pencil,
+  UploadCloud,
+  Globe
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import * as docx from 'docx-preview';
 import { DocumentItem } from '../types';
-import { getOriginalFile, downloadRealDocument, StoredFileRecord, getFreshArrayBuffer } from '../utils/fileStorage';
+import { getOriginalFile, saveOriginalFile, downloadRealDocument, StoredFileRecord, getFreshArrayBuffer } from '../utils/fileStorage';
 import { PdfCanvasViewer } from './PdfCanvasViewer';
+
+function getEmbedUrl(url?: string): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  // Google Drive file
+  const gDriveMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (gDriveMatch && gDriveMatch[1]) {
+    return `https://drive.google.com/file/d/${gDriveMatch[1]}/preview`;
+  }
+  const gDriveIdMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (gDriveIdMatch && gDriveIdMatch[1]) {
+    return `https://drive.google.com/file/d/${gDriveIdMatch[1]}/preview`;
+  }
+  return trimmed;
+}
 
 interface DocumentPreviewModalProps {
   document: DocumentItem | null;
@@ -48,9 +65,11 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'original' | 'formatted' | 'meta'>('original');
+  const [activeTab, setActiveTab] = useState<'original' | 'drive' | 'formatted' | 'meta'>('original');
   const [loadingFile, setLoadingFile] = useState(false);
   const [storedFile, setStoredFile] = useState<StoredFileRecord | null>(null);
+  const [isUploadingDirect, setIsUploadingDirect] = useState(false);
+  const directFileInputRef = useRef<HTMLInputElement>(null);
   
   // Excel states
   const [excelSheets, setExcelSheets] = useState<string[]>([]);
@@ -100,6 +119,8 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 console.error('Failed to parse Excel workbook:', e);
               }
             }
+          } else if (document.externalLink) {
+            setActiveTab('drive');
           } else {
             // No custom uploaded file, default to formatted CV 5512 or auto-generated view
             setActiveTab('formatted');
@@ -118,6 +139,21 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       isMounted = false;
     };
   }, [document]);
+
+  const handleDirectUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !document) return;
+    setIsUploadingDirect(true);
+    try {
+      const record = await saveOriginalFile(document.id, file);
+      setStoredFile(record);
+      setActiveTab('original');
+    } catch (err) {
+      console.error('Direct upload failed:', err);
+    } finally {
+      setIsUploadingDirect(false);
+    }
+  };
 
   // Handle DOCX rendering when container is ready or tab switches to original
   useEffect(() => {
@@ -337,34 +373,48 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
         {/* Navigation Mode Tabs Bar */}
         <div className="bg-[#12151B] px-4 sm:px-6 py-2 border-b border-slate-800 flex items-center justify-between flex-wrap gap-2">
           
-          <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+          <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800 overflow-x-auto max-w-full">
             <button
               onClick={() => setActiveTab('original')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                 activeTab === 'original'
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <Eye className="w-3.5 h-3.5" />
-              <span>{storedFile ? 'Xem trước Tệp Gốc' : 'Xem trước Tài Liệu'}</span>
+              <span>{storedFile ? 'Tệp Bản Gốc' : 'Xem Trước Tệp'}</span>
             </button>
+
+            {document.externalLink && (
+              <button
+                onClick={() => setActiveTab('drive')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                  activeTab === 'drive'
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5 text-sky-400" />
+                <span>Google Drive / Online</span>
+              </button>
+            )}
 
             <button
               onClick={() => setActiveTab('formatted')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                 activeTab === 'formatted'
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <FileText className="w-3.5 h-3.5" />
-              <span>Kế hoạch & Giáo án CV 5512</span>
+              <span>Kế hoạch CV 5512</span>
             </button>
 
             <button
               onClick={() => setActiveTab('meta')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                 activeTab === 'meta'
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : 'text-slate-400 hover:text-slate-200'
@@ -384,14 +434,50 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
         </div>
 
+        {/* Hidden file input for direct file upload on mobile/desktop */}
+        <input
+          ref={directFileInputRef}
+          type="file"
+          accept=".pdf,.docx,.doc,.xlsx,.xls,.png,.jpg,.jpeg,.csv"
+          onChange={handleDirectUpload}
+          className="hidden"
+        />
+
         {/* Content Viewer Body */}
         <div className="flex-1 overflow-y-auto bg-[#0A0C10] text-slate-200 p-3 sm:p-6 flex flex-col">
           
           {loadingFile ? (
             <div className="flex-1 flex flex-col items-center justify-center space-y-3 py-16">
               <RefreshCw className="w-8 h-8 text-indigo-400 animate-spin" />
-              <p className="text-xs font-mono text-slate-400">Đang tải và dựng nội dung tệp bản gốc...</p>
+              <p className="text-xs font-mono text-slate-400">Đang tải và dựng nội dung tệp bản gốc từ bộ nhớ / Đám mây...</p>
             </div>
+          ) : activeTab === 'drive' && document.externalLink ? (
+            
+            /* GOOGLE DRIVE / ONLINE PREVIEW */
+            <div className="flex-1 flex flex-col w-full h-full min-h-[550px] bg-slate-900 rounded-xl overflow-hidden border border-slate-800 shadow-xl">
+              <div className="bg-slate-950 px-4 py-2 border-b border-slate-800 flex items-center justify-between">
+                <span className="text-xs font-mono text-slate-400 flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5 text-sky-400" />
+                  Xem trực tuyến qua Google Drive / OneDrive
+                </span>
+                <a
+                  href={document.externalLink}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded inline-flex items-center gap-1 transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span>Mở toàn trang</span>
+                </a>
+              </div>
+              <iframe
+                src={getEmbedUrl(document.externalLink) || document.externalLink}
+                title={document.title}
+                className="w-full flex-1 min-h-[500px] border-none bg-white"
+                allow="autoplay"
+              />
+            </div>
+
           ) : activeTab === 'original' ? (
             
             <div className="flex-1 flex flex-col w-full h-full min-h-[500px]">
@@ -410,34 +496,61 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                   />
                 </div>
               ) : isPdf && !storedFile ? (
-                /* Fallback PDF view with rich simulated PDF reader */
-                <div className="max-w-3xl mx-auto w-full bg-white text-slate-900 rounded-xl p-8 sm:p-12 shadow-2xl font-serif">
-                  <div className="border-b-2 border-slate-900 pb-4 mb-6">
-                    <div className="flex justify-between text-xs font-bold uppercase">
+                /* Fallback PDF view with rich card and one-click direct upload */
+                <div className="max-w-3xl mx-auto w-full space-y-4">
+                  {/* Notice Banner */}
+                  <div className="bg-slate-900/90 border border-indigo-500/30 rounded-xl p-4 sm:p-5 text-xs text-slate-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-indigo-950 text-indigo-400 border border-indigo-800/40">
+                        <UploadCloud className="w-5 h-5" />
+                      </div>
                       <div>
-                        <p>SỞ GD&ĐT THANH HÓA</p>
-                        <p className="text-blue-900">{document.school}</p>
-                      </div>
-                      <div className="text-right">
-                        <p>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
-                        <p className="normal-case italic font-normal text-slate-600">Độc lập - Tự do - Hạnh phúc</p>
+                        <h4 className="font-bold text-slate-100 text-sm">Chưa có tệp PDF đầy đủ trên thiết bị này</h4>
+                        <p className="text-slate-400 text-xs mt-0.5">
+                          Bạn có thể chọn tệp PDF trực tiếp từ điện thoại để xem trọn vẹn và tự động lưu vào Đám mây.
+                        </p>
                       </div>
                     </div>
-                    <div className="text-center mt-6">
-                      <h1 className="text-xl font-bold uppercase text-slate-900">{document.title}</h1>
-                      <p className="text-xs font-sans text-slate-600 mt-1">
-                        Danh mục: {document.category} • Năm học: {document.academicYear}
-                      </p>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <button
+                        onClick={() => directFileInputRef.current?.click()}
+                        disabled={isUploadingDirect}
+                        className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        {isUploadingDirect ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5" />}
+                        <span>Tải tệp từ điện thoại</span>
+                      </button>
                     </div>
                   </div>
-                  <div className="font-sans text-xs sm:text-sm text-slate-800 leading-relaxed whitespace-pre-line">
-                    {document.contentPreview || 'Kế hoạch dạy học phân phối chương trình môn Toán học chuẩn GDPT 2018.'}
-                  </div>
-                  <div className="mt-10 pt-4 border-t border-slate-300 flex justify-between text-xs font-sans text-slate-600">
-                    <div>Mã lưu trữ: {document.id}</div>
-                    <div className="text-center font-serif">
-                      <p className="font-bold text-slate-900">{document.author}</p>
-                      <p className="text-[11px] italic">Giáo viên bộ môn Toán</p>
+
+                  <div className="bg-white text-slate-900 rounded-xl p-8 sm:p-12 shadow-2xl font-serif">
+                    <div className="border-b-2 border-slate-900 pb-4 mb-6">
+                      <div className="flex justify-between text-xs font-bold uppercase">
+                        <div>
+                          <p>SỞ GD&ĐT THANH HÓA</p>
+                          <p className="text-blue-900">{document.school}</p>
+                        </div>
+                        <div className="text-right">
+                          <p>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+                          <p className="normal-case italic font-normal text-slate-600">Độc lập - Tự do - Hạnh phúc</p>
+                        </div>
+                      </div>
+                      <div className="text-center mt-6">
+                        <h1 className="text-xl font-bold uppercase text-slate-900">{document.title}</h1>
+                        <p className="text-xs font-sans text-slate-600 mt-1">
+                          Danh mục: {document.category} • Năm học: {document.academicYear}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="font-sans text-xs sm:text-sm text-slate-800 leading-relaxed whitespace-pre-line">
+                      {document.contentPreview || 'Kế hoạch dạy học phân phối chương trình môn Toán học chuẩn GDPT 2018.'}
+                    </div>
+                    <div className="mt-10 pt-4 border-t border-slate-300 flex justify-between text-xs font-sans text-slate-600">
+                      <div>Mã lưu trữ: {document.id}</div>
+                      <div className="text-center font-serif">
+                        <p className="font-bold text-slate-900">{document.author}</p>
+                        <p className="text-[11px] italic">Giáo viên bộ môn Toán</p>
+                      </div>
                     </div>
                   </div>
                 </div>

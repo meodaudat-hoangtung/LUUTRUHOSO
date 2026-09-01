@@ -189,6 +189,32 @@ export async function getOriginalFile(docId: string): Promise<StoredFileRecord |
   try {
     const record = (await get(`${STORAGE_PREFIX}${docId}`)) as StoredFileRecord | undefined;
     if (record && (record.blob || record.uint8Array || record.arrayBuffer || record.dataUrl)) {
+      // Auto-sync legacy local files to Cloud Firestore so mobile devices can access them
+      if (!record.isCloudSynced) {
+        (async () => {
+          try {
+            let uint8 = record.uint8Array;
+            if (!uint8 && record.blob) {
+              const ab = await record.blob.arrayBuffer();
+              uint8 = new Uint8Array(ab);
+            } else if (!uint8 && record.arrayBuffer) {
+              uint8 = new Uint8Array(record.arrayBuffer);
+            }
+            if (uint8 && uint8.length > 0) {
+              await saveFileChunksToFirestore(docId, {
+                fileName: record.fileName,
+                mimeType: record.mimeType || 'application/octet-stream',
+                fileSize: record.fileSize || formatBytes(uint8.length),
+                uint8Array: uint8
+              });
+              record.isCloudSynced = true;
+              await set(`${STORAGE_PREFIX}${docId}`, record);
+            }
+          } catch (syncErr) {
+            console.warn('Background sync to Cloud Firestore skipped:', syncErr);
+          }
+        })();
+      }
       return record;
     }
   } catch (err) {

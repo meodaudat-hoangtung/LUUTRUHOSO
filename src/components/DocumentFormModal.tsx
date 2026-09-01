@@ -8,7 +8,8 @@ import {
   Star,
   FileCheck,
   FileSpreadsheet,
-  AlertCircle
+  AlertCircle,
+  Globe
 } from 'lucide-react';
 import { DocumentCategory, DocumentItem, FileFormat, Grade, Semester, TeacherProfile } from '../types';
 import { saveOriginalFile, inferFileFormat, formatBytes } from '../utils/fileStorage';
@@ -39,6 +40,7 @@ export const DocumentFormModal: React.FC<DocumentFormModalProps> = ({
   const [isPinned, setIsPinned] = useState(false);
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState('2.4 MB');
+  const [externalLink, setExternalLink] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -56,6 +58,7 @@ export const DocumentFormModal: React.FC<DocumentFormModalProps> = ({
       setIsPinned(initialDoc.isPinned);
       setFileSize(initialDoc.fileSize || '2.4 MB');
       setFileName(initialDoc.originalFileName || `${initialDoc.title.toLowerCase().replace(/\s+/g, '_')}.${initialDoc.fileType === 'PDF' ? 'pdf' : 'docx'}`);
+      setExternalLink(initialDoc.externalLink || '');
       setSelectedFile(null);
     } else {
       // Reset form
@@ -70,6 +73,7 @@ export const DocumentFormModal: React.FC<DocumentFormModalProps> = ({
       setIsPinned(false);
       setFileName('');
       setFileSize('1.8 MB');
+      setExternalLink('');
       setSelectedFile(null);
     }
   }, [initialDoc, isOpen]);
@@ -235,7 +239,8 @@ b) Nhiệm vụ về nhà: Tìm hiểu thêm các mô hình toán học ứng d�
       fileMimeType,
       fileDataUrl,
       hasOriginalFile,
-      hasCloudFile
+      hasCloudFile,
+      externalLink: externalLink.trim()
     };
 
     setIsSaving(false);
@@ -456,6 +461,27 @@ b) Nhiệm vụ về nhà: Tìm hiểu thêm các mô hình toán học ứng d�
               />
             </div>
 
+          </div>
+
+          {/* External Google Drive / Cloud Link */}
+          <div>
+            <label className="block text-xs font-mono font-medium text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-sky-400" />
+                <span>Link Google Drive / OneDrive / Xem trực tuyến (Tùy chọn)</span>
+              </span>
+              <span className="text-[10px] text-slate-500 font-normal">Hỗ trợ xem tệp mọi lúc mọi nơi</span>
+            </label>
+            <input
+              type="url"
+              placeholder="https://drive.google.com/file/d/... hoặc https://onedrive.live.com/..."
+              value={externalLink}
+              onChange={(e) => setExternalLink(e.target.value)}
+              className="w-full px-3.5 py-2 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono"
+            />
+            <p className="text-[11px] text-slate-400 mt-1">
+              💡 Dán link Google Drive chia sẻ công khai để bất kỳ điện thoại hay máy tính nào cũng mở xem mượt mà 100%.
+            </p>
           </div>
 
           {/* Description */}
