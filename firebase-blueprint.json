@@ -49,7 +49,8 @@
         "tags": { "type": "array", "items": { "type": "string" } },
         "fileDataUrl": { "type": "string" },
         "downloadUrl": { "type": "string" },
-        "externalLink": { "type": "string" }
+        "externalLink": { "type": "string" },
+        "videoUrl": { "type": "string" }
       },
       "required": ["title", "category", "fileType"]
     },

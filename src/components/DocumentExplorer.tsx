@@ -192,6 +192,7 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({
             <option value="WORD DOCX">Word (*.docx)</option>
             <option value="EXCEL">Excel (*.xlsx)</option>
             <option value="POWERPOINT">PowerPoint (*.pptx)</option>
+            <option value="VIDEO">Video bài giảng (YouTube, FB...)</option>
           </select>
 
         </div>
@@ -330,6 +331,8 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({
                           ? 'bg-blue-900/80 text-sky-200 border border-sky-700/40'
                           : doc.fileType === 'EXCEL'
                           ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/40'
+                          : doc.fileType === 'VIDEO'
+                          ? 'bg-rose-950/80 text-rose-400 border border-rose-800/40'
                           : 'bg-amber-950/80 text-amber-300 border border-amber-800/40'
                       }`}>
                         {doc.fileType}

@@ -1,4 +1,4 @@
-export type FileFormat = 'PDF' | 'WORD DOCX' | 'EXCEL' | 'POWERPOINT';
+export type FileFormat = 'PDF' | 'WORD DOCX' | 'EXCEL' | 'POWERPOINT' | 'VIDEO';
 
 export type Semester = 'Cả năm' | 'Học kỳ 1' | 'Học kỳ 2';
 
@@ -42,6 +42,7 @@ export interface DocumentItem {
   hasOriginalFile?: boolean;
   hasCloudFile?: boolean;
   externalLink?: string;
+  videoUrl?: string;
 }
 
 export interface TeacherProfile {

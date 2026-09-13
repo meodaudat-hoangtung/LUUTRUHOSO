@@ -387,5 +387,24 @@ export const initialDocuments: DocumentItem[] = [
     school: 'THPT Tĩnh Gia 4',
     contentPreview: sampleExamBankContent,
     tags: ['Ngân hàng đề thi', 'Ma trận', 'Định dạng mới']
+  },
+  {
+    id: 'doc-11',
+    title: 'VIDEO TIẾT DẠY MINH HỌA TOÁN 10 - HỆ THỨC LƯỢNG TRONG TAM GIÁC',
+    category: 'GIÁO ÁN TOÁN 10',
+    grade: '10',
+    semester: 'Học kỳ 1',
+    academicYear: '2026 - 2027',
+    fileType: 'VIDEO',
+    fileSize: 'Video HD',
+    isPinned: true,
+    createdAt: '2026-08-31',
+    updatedAt: '2026-09-01',
+    description: 'Video tiết dạy thực nghiệm minh họa chuỗi 4 hoạt động đổi mới phương pháp chuẩn Công văn 5512/BGDĐT.',
+    author: 'Hoàng Tùng',
+    school: 'THPT Tĩnh Gia 4',
+    contentPreview: sampleToan10Content,
+    videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    tags: ['Video bài giảng', 'Giáo án Toán 10', 'YouTube', 'CV 5512']
   }
 ];

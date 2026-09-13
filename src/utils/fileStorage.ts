@@ -315,6 +315,14 @@ export async function downloadRealDocument(doc: DocumentItem): Promise<void> {
   // 2. Otherwise generate a real native file corresponding to doc.fileType
   const cleanTitle = doc.title.replace(/[/\\?%*:|"<>]/g, '_');
 
+  if (doc.fileType === 'VIDEO' && doc.videoUrl) {
+    // Download internet shortcut file that opens the video in any browser
+    const urlContent = `[InternetShortcut]\r\nURL=${doc.videoUrl}\r\n`;
+    const blob = new Blob([urlContent], { type: 'text/plain;charset=utf-8' });
+    triggerBlobDownload(blob, `${cleanTitle}.url`);
+    return;
+  }
+
   if (doc.fileType === 'EXCEL') {
     // Generate real .xlsx file with SheetJS
     const rows = [

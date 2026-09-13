@@ -9,10 +9,13 @@ import {
   FileCheck,
   FileSpreadsheet,
   AlertCircle,
-  Globe
+  Globe,
+  Video,
+  Play
 } from 'lucide-react';
 import { DocumentCategory, DocumentItem, FileFormat, Grade, Semester, TeacherProfile } from '../types';
 import { saveOriginalFile, inferFileFormat, formatBytes } from '../utils/fileStorage';
+import { parseVideoUrl } from '../utils/videoUtils';
 
 interface DocumentFormModalProps {
   isOpen: boolean;
@@ -41,6 +44,7 @@ export const DocumentFormModal: React.FC<DocumentFormModalProps> = ({
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState('2.4 MB');
   const [externalLink, setExternalLink] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -59,6 +63,7 @@ export const DocumentFormModal: React.FC<DocumentFormModalProps> = ({
       setFileSize(initialDoc.fileSize || '2.4 MB');
       setFileName(initialDoc.originalFileName || `${initialDoc.title.toLowerCase().replace(/\s+/g, '_')}.${initialDoc.fileType === 'PDF' ? 'pdf' : 'docx'}`);
       setExternalLink(initialDoc.externalLink || '');
+      setVideoUrl(initialDoc.videoUrl || '');
       setSelectedFile(null);
     } else {
       // Reset form
@@ -74,6 +79,7 @@ export const DocumentFormModal: React.FC<DocumentFormModalProps> = ({
       setFileName('');
       setFileSize('1.8 MB');
       setExternalLink('');
+      setVideoUrl('');
       setSelectedFile(null);
     }
   }, [initialDoc, isOpen]);
@@ -240,7 +246,8 @@ b) Nhiệm vụ về nhà: Tìm hiểu thêm các mô hình toán học ứng d�
       fileDataUrl,
       hasOriginalFile,
       hasCloudFile,
-      externalLink: externalLink.trim()
+      externalLink: externalLink.trim(),
+      videoUrl: videoUrl.trim()
     };
 
     setIsSaving(false);
@@ -406,6 +413,7 @@ b) Nhiệm vụ về nhà: Tìm hiểu thêm các mô hình toán học ứng d�
                 <option value="WORD DOCX">Word Document (*.docx)</option>
                 <option value="EXCEL">Excel Spreadsheet (*.xlsx)</option>
                 <option value="POWERPOINT">PowerPoint Presentation (*.pptx)</option>
+                <option value="VIDEO">Video bài giảng (*.mp4, YouTube, FB...)</option>
               </select>
             </div>
 
@@ -461,6 +469,73 @@ b) Nhiệm vụ về nhà: Tìm hiểu thêm các mô hình toán học ứng d�
               />
             </div>
 
+          </div>
+
+          {/* Video Link (YouTube, Facebook, v.v.) */}
+          <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 space-y-2">
+            <label className="block text-xs font-mono font-medium text-slate-300 uppercase tracking-wider flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-red-400">
+                <Video className="w-4 h-4 text-red-400" />
+                <span className="text-slate-200 font-bold">Đường link Video bài giảng (YouTube, Facebook, v.v.)</span>
+              </span>
+              <span className="text-[10px] text-sky-400 font-normal">Hỗ trợ nhúng phát video trực tiếp</span>
+            </label>
+            
+            <div className="relative">
+              <input
+                type="url"
+                placeholder="Dán link YouTube (https://youtu.be/... hoặc youtube.com/watch?v=...) hoặc Facebook Video..."
+                value={videoUrl}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setVideoUrl(val);
+                  if (val.trim() && fileType === 'PDF' && !selectedFile && !initialDoc) {
+                    setFileType('VIDEO');
+                  }
+                }}
+                className="w-full px-3.5 py-2 text-xs bg-slate-950 border border-slate-700 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-red-500 font-mono"
+              />
+            </div>
+
+            {/* Video preview & detected info */}
+            {videoUrl.trim() && (() => {
+              const info = parseVideoUrl(videoUrl);
+              if (!info) return null;
+              return (
+                <div className="flex items-center gap-3 p-2 rounded-lg bg-black/40 border border-slate-800 mt-2">
+                  {info.thumbnailUrl ? (
+                    <img 
+                      src={info.thumbnailUrl} 
+                      alt="Thumbnail" 
+                      className="w-16 h-10 object-cover rounded border border-slate-700 flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded bg-red-950/60 border border-red-800/40 flex items-center justify-center flex-shrink-0 text-red-400">
+                      <Play className="w-4 h-4" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${
+                        info.platform === 'youtube' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'
+                      }`}>
+                        {info.platformName}
+                      </span>
+                      <span className="text-emerald-400 font-medium text-[11px] flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Đã nhận diện hợp lệ
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                      {info.originalUrl}
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <p className="text-[11px] text-slate-400">
+              💡 Hỗ trợ: <strong>YouTube</strong> (mọi link video thường, shorts, youtu.be), <strong>Facebook</strong> (video công khai, Facebook Watch), <strong>Google Drive Video</strong> hoặc file MP4 trực tiếp.
+            </p>
           </div>
 
           {/* External Google Drive / Cloud Link */}

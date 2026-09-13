@@ -23,13 +23,15 @@ import {
   Trash2,
   Pencil,
   UploadCloud,
-  Globe
+  Globe,
+  Video
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import * as docx from 'docx-preview';
 import { DocumentItem } from '../types';
 import { getOriginalFile, saveOriginalFile, downloadRealDocument, StoredFileRecord, getFreshArrayBuffer } from '../utils/fileStorage';
 import { PdfCanvasViewer } from './PdfCanvasViewer';
+import { VideoPlayer } from './VideoPlayer';
 
 function getEmbedUrl(url?: string): string | null {
   if (!url) return null;
@@ -65,7 +67,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'original' | 'drive' | 'formatted' | 'meta'>('original');
+  const [activeTab, setActiveTab] = useState<'original' | 'drive' | 'video' | 'formatted' | 'meta'>('original');
   const [loadingFile, setLoadingFile] = useState(false);
   const [storedFile, setStoredFile] = useState<StoredFileRecord | null>(null);
   const [isUploadingDirect, setIsUploadingDirect] = useState(false);
@@ -119,8 +121,12 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 console.error('Failed to parse Excel workbook:', e);
               }
             }
+          } else if (document.videoUrl && (document.fileType === 'VIDEO' || !document.externalLink)) {
+            setActiveTab('video');
           } else if (document.externalLink) {
             setActiveTab('drive');
+          } else if (document.videoUrl) {
+            setActiveTab('video');
           } else {
             // No custom uploaded file, default to formatted CV 5512 or auto-generated view
             setActiveTab('formatted');
@@ -400,6 +406,20 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               </button>
             )}
 
+            {document.videoUrl && (
+              <button
+                onClick={() => setActiveTab('video')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                  activeTab === 'video'
+                    ? 'bg-red-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Video className="w-3.5 h-3.5 text-red-400" />
+                <span>Video Bài Giảng</span>
+              </button>
+            )}
+
             <button
               onClick={() => setActiveTab('formatted')}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
@@ -476,6 +496,60 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 className="w-full flex-1 min-h-[500px] border-none bg-white"
                 allow="autoplay"
               />
+            </div>
+
+          ) : activeTab === 'video' && document.videoUrl ? (
+            
+            /* VIDEO PLAYER VIEW (YouTube, Facebook, etc.) */
+            <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full space-y-4 py-2">
+              <VideoPlayer 
+                videoUrl={document.videoUrl} 
+                title={document.title} 
+              />
+
+              <div className="bg-[#12151B] p-4 sm:p-5 rounded-xl border border-slate-800 space-y-3">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase bg-red-950/80 text-red-400 border border-red-800/40">
+                      Tài nguyên Video bài giảng
+                    </span>
+                    <h3 className="text-base font-bold text-slate-100 mt-1.5">{document.title}</h3>
+                  </div>
+                  <a
+                    href={document.videoUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium flex items-center gap-1.5 border border-slate-700 shrink-0"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Mở link gốc</span>
+                  </a>
+                </div>
+
+                {document.description && (
+                  <p className="text-xs text-slate-300 leading-relaxed border-t border-slate-800/80 pt-3">
+                    {document.description}
+                  </p>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-slate-400">
+                  <span className="px-2 py-0.5 rounded bg-slate-800 text-indigo-300 font-mono">
+                    {document.category}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
+                    Khối {document.grade === 'all' ? '10, 11, 12' : document.grade}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
+                    {document.semester}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
+                    NH {document.academicYear}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-sans">
+                    Tác giả: {document.author}
+                  </span>
+                </div>
+              </div>
             </div>
 
           ) : activeTab === 'original' ? (

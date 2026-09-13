@@ -250,7 +250,8 @@ export function subscribeToDocuments(onData: (docs: DocumentItem[]) => void, onE
           fileMimeType: data.fileMimeType || '',
           hasOriginalFile: Boolean(data.hasOriginalFile),
           hasCloudFile: Boolean(data.hasCloudFile),
-          externalLink: data.externalLink || ''
+          externalLink: data.externalLink || '',
+          videoUrl: data.videoUrl || ''
         } as DocumentItem);
       });
 

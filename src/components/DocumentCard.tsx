@@ -6,7 +6,8 @@ import {
   Pencil, 
   Trash2, 
   Star,
-  Clock
+  Clock,
+  Video
 } from 'lucide-react';
 import { DocumentItem } from '../types';
 
@@ -77,6 +78,18 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
             {document.fileType === 'POWERPOINT' && (
               <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-extrabold bg-amber-500/90 text-white border border-amber-300/50 shadow-2xs">
                 PPTX
+              </span>
+            )}
+            {document.fileType === 'VIDEO' && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-extrabold bg-rose-600 text-white border border-rose-300/60 shadow-2xs flex items-center gap-0.5">
+                <Video className="w-2.5 h-2.5" />
+                VIDEO
+              </span>
+            )}
+            {document.videoUrl && document.fileType !== 'VIDEO' && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-rose-600/80 text-white border border-rose-300/40 shadow-2xs flex items-center gap-0.5">
+                <Video className="w-2.5 h-2.5" />
+                Video
               </span>
             )}
             {document.hasOriginalFile && (
